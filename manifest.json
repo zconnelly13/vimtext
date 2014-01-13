@@ -1,7 +1,7 @@
 {
    "version": "1.0",
    "manifest_version": 2,
-   "name": "Javascript Injector",
+   "name": "Vimtext",
    "permissions": ["http://*/*"],
    "content_scripts": [
    {
