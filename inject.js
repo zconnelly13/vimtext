@@ -18,14 +18,14 @@ function hideTextArea(textArea) {
 }
 
 function getTextAreaWidth(textArea) {
-    var width = textArea.width;
+    var width = textArea.getAttribute('width');
     if (width == "" || width === undefined) {
         width = "500px";
     }
 }
 
 function getTextAreaHeight(textArea) {
-    var height= textArea.height;
+    var height= textArea.getAttribute('height');
     if (height == "" || height === undefined) {
         height = "100px";
     }
@@ -55,7 +55,7 @@ function VimtextArea(textArea) {
     this.element.style.borderColor = "grey";
     this.element.style.fontFamily = "Courier New";
     this.element.style.fontSize = "15px";
-    this.element.style.whiteSpace = "pre";
+    this.element.style.whiteSpace = "pre-wrap";
     this.element.setAttribute("tabindex",0);
 
     this.replaceTextArea = function() {
@@ -67,7 +67,6 @@ function VimtextArea(textArea) {
 
         this.textArea.addEventListener('keydown',function(event) {
             // fucking javascript http://stackoverflow.com/questions/14841739/javascript-keypress-event-get-end-value-of-textarea
-            console.log('keydown');
             var e = event;
             if (vimtext.insertMode) {
                 setTimeout(function() {
@@ -80,11 +79,9 @@ function VimtextArea(textArea) {
         });
 
         this.textArea.addEventListener('keypress',function(event) {
-            console.log("keypress");
         });
 
         this.textArea.addEventListener('keyup',function(event) {
-            console.log("keyup");
         });
 
         this.textArea.addEventListener('focus',function(event) {
@@ -102,16 +99,155 @@ function VimtextArea(textArea) {
         switch(character)
         {
             case "i":
-                this.textArea.selectionStart--;
-                this.textArea.selectionEnd--;
-                this.setInsertMode();
+                this.insert();
                 break;
             case "a":
-                this.setInsertMode();
+                this.append();
+                break;
+            case "t":
+                this.up();
+                break;
+            case "h":
+                this.down();
+                break;
+            case "n":
+                this.left();
+                break;
+            case "s":
+                this.right();
+                break;
             default:
                 console.log(character);
         }
         this.update();
+    }
+
+    this.insert = function() {
+        this.setInsertMode();
+    }
+
+    this.append = function() {
+        this.right();
+        this.setInsertMode();
+    }
+
+    this.getCaratPosition = function() {
+        var caratPosition = this.textArea.selectionStart;
+        return caratPosition;
+    }
+
+    this.getLines = function() {
+        var lines = this.textArea.value.split("\n");
+        return lines;
+    }
+    
+    this.getTotalCharacters = function() {
+        var characters = this.textArea.value.length;
+        return characters;
+    }
+
+    this.getCumulativeLines = function() {
+        var lines = this.getLines();
+        for (var i=0;i<lines.length;i++) {
+            lines[i] += " ";
+        }
+        for (var i=1;i<lines.length;i++) {
+            lines[i] = lines[i-1]+lines[i];
+        }
+        return lines;
+    }
+
+    this.getCaratLine = function() {
+        var lines = this.getLines();
+        var position = this.getCaratPosition();
+        var checkPosition = 0;
+        var caratLine = 0;
+        for (var i=0;i<lines.length;i++) {
+            var line = lines[i];
+            checkPosition += line.length + 1;
+            if (position < checkPosition) {
+                caratLine = i;
+                break;
+            }
+        }
+        return caratLine;
+    }
+
+    this.getCaratPositionOnLine = function() {
+        var caratLine = this.getCaratLine();
+        if (caratLine == 0) {
+            var position = this.getCaratPosition();
+        } else {
+            var position = this.getCaratPosition()-this.getCumulativeLines()[caratLine-1].length;
+        }
+        return position;
+    }
+
+    this.up = function() {
+        var caratLine = this.getCaratLine();
+        if (caratLine != 0) {
+            var lines = this.getLines();
+            if (lines.length > 1) {
+                var positionOnLine = this.getCaratPositionOnLine();
+                var lengthOfAboveLine = this.getLines()[caratLine-1].length;
+                var newPositionOnLine = 0;
+                if (lengthOfAboveLine < positionOnLine) {
+                    newPositionOnLine = lengthOfAboveLine;
+                } else {
+                    newPositionOnLine = positionOnLine;
+                }
+                var moveBackLength = positionOnLine + 1 + (lengthOfAboveLine-newPositionOnLine);
+                this.moveCaratLeft(moveBackLength);
+            }
+        }
+    }
+
+    this.down = function() {
+        var caratLine = this.getCaratLine();
+        var lines = this.getLines();
+        if (lines.length > 1) {
+            if (caratLine < lines.length-1) {
+                var positionOnLine = this.getCaratPositionOnLine();
+                var lengthOfBelowLine = this.getLines()[caratLine+1].length;
+                var newPositionOnLine = 0;
+                if (lengthOfBelowLine < positionOnLine) {
+                    newPositionOnLine = lengthOfBelowLine;
+                } else {
+                    newPositionOnLine = positionOnLine;
+                }
+                var moveForwardLength = this.getLines()[caratLine].length-positionOnLine + 1 + newPositionOnLine;
+                this.moveCaratRight(moveForwardLength); 
+            }
+        }
+    }
+
+    this.left = function() {
+        this.textArea.selectionStart--;
+        this.textArea.selectionEnd--;
+    }
+
+    this.right = function() {
+        this.textArea.selectionEnd++;
+        this.textArea.selectionStart++;
+    }
+
+    this.moveCaratLeft = function(spaces) {
+        for(var i=0;i<spaces;i++) {
+            this.left();
+        }
+    }
+
+    this.moveCaratRight = function(spaces) {
+        for(var i=0;i<spaces;i++) {
+            this.right();
+        }
+    }
+
+    this.sendKeyPress = function(element,keyCode) {
+        var eventObject = document.createEvent("Events");
+        eventObject.initEvent("keydown",true,true);
+        eventObject.which = keyCode;
+        element.dispatchEvent(eventObject);
     }
 
     this.setElementEventListeners = function() {
@@ -154,7 +290,7 @@ function VimtextArea(textArea) {
         if (this.insertMode) {
             styleString += "font-weight: bold;font-size: 17px;color: #eee59a;margin: -4px;position:absolute;margin-top: -1px;";
         } else if (this.normalMode) {
-            styleString += "color: #778176;background-color: #eee59a;position:absolute;margin-top: 0px;margin-left:-10px;height:17px;width:10px;";
+            styleString += "color: #778176;background-color: #eee59a;position:absolute;margin-top: 0px;margin-left:0px;height:17px;width:10px;";
         } 
 
         var caratHtml = "<span id='vimtextcarat' style='" + styleString + "'>" + this.getCaratCharacter(string,caratPosition) + "</span>";
@@ -165,7 +301,7 @@ function VimtextArea(textArea) {
         if (this.insertMode) {
             return "|";
         } else if (this.normalMode) {
-            return string.charAt(caratPosition-1);
+            return string.charAt(caratPosition);
         }
     }
 
@@ -179,13 +315,11 @@ function VimtextArea(textArea) {
     this.setNormalMode = function() {
         this.insertMode = false;
         this.normalMode = true;
-        this.textArea.readOnly = true;
     }
 
     this.setInsertMode = function() {
         this.insertMode = true;
         this.normalMode = false;
-        this.textArea.readOnly = false;
     }
 
     this.setDocumentEventListeners = function() {
