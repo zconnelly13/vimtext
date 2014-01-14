@@ -93,16 +93,72 @@ function VimtextArea(textArea) {
         });
     }
 
+    this.keyCodeToCharacter = function(keyCode) {
+        var map = [
+            [9,"<TAB>"],
+
+            [48,"0"],
+            [49,"1"],
+            [50,"2"],
+            [51,"3"],
+            [52,"4"],
+            [53,"5"],
+            [54,"6"],
+            [55,"7"],
+            [56,"8"],
+            [57,"9"],
+
+            [65,"a"],
+            [66,"b"],
+            [67,"c"],
+            [68,"d"],
+            [69,"e"],
+            [70,"f"],
+            [71,"g"],
+            [72,"h"],
+            [73,"i"],
+            [74,"j"],
+            [75,"k"],
+            [76,"l"],
+            [77,"m"],
+            [78,"n"],
+            [79,"o"],
+            [80,"p"],
+            [81,"q"],
+            [82,"r"],
+            [83,"s"],
+            [84,"t"],
+            [85,"u"],
+            [86,"v"],
+            [87,"w"],
+            [88,"x"],
+            [89,"y"],
+            [90,"z"]
+
+        ];
+        var character = "";
+        for (var i=0;i<map.length;i++) {
+            if (map[i][0] == keyCode) {
+                character = map[i][1];
+            }
+        }
+        return character;
+    }
+
     this.normalKeyDown = function(e) {
         var keyCode = e.keyCode;
-        var character = String.fromCharCode(keyCode).toLowerCase();
+        var character = this.keyCodeToCharacter(keyCode);
         switch(character)
         {
             case "i":
                 this.insert();
                 break;
             case "a":
-                this.append();
+                if (e.shiftKey) {
+                    this.appendToEndOfLine();
+                } else {
+                    this.append();
+                }
                 break;
             case "t":
                 this.up();
@@ -116,10 +172,69 @@ function VimtextArea(textArea) {
             case "s":
                 this.right();
                 break;
+            case "o":
+                if (e.shiftKey) {
+                    this.insertLineAbove();
+                } else {
+                    this.insertLineBelow();
+                }
+                break;
+            case "0":
+                this.goToStartOfLine();
+                break;
+            case "4":
+                if (e.shiftKey) {
+                    this.goToEndOfLine();
+                }
+                break;
             default:
                 console.log(character);
         }
+        console.log(keyCode + "," + character);
         this.update();
+    }
+
+    this.insertStringAtCarat = function(string) {
+        var position = this.getCaratPosition();
+        this.textArea.value = this.textArea.value.substring(0,position) + string + this.textArea.value.substring(position,this.textArea.value.length);
+        position += string.length;
+        this.textArea.selectionStart = position;
+        this.textArea.selectionEnd = position;
+    }
+
+    this.insertLineBelow = function() {
+        this.appendToEndOfLine();
+        this.insertStringAtCarat("\n");
+    }
+
+    this.insertLineAbove = function() {
+        this.goToStartOfLine();
+        this.insert();
+        this.insertStringAtCarat("\n");
+        this.up();
+    }
+
+    this.goToStartOfLine = function() {
+        this.moveCaratLeft(this.getCaratPositionOnLine());
+    }
+
+    this.goToEndOfLine = function() {
+        this.moveCaratRight(this.getDistanceToEndOfLine());
+    }
+
+    this.appendToEndOfLine = function() {
+        this.goToEndOfLine();
+        this.append();
+    }
+
+    this.getDistanceToEndOfLine = function() {
+        var distance;
+        if (this.getLines()[this.getCaratLine()].length == 0) {
+            distance = 0;
+        } else {
+            distance = this.getLines()[this.getCaratLine()].length-this.getCaratPositionOnLine() - 1;
+        }
+        return distance;
     }
 
     this.insert = function() {
@@ -127,7 +242,9 @@ function VimtextArea(textArea) {
     }
 
     this.append = function() {
-        this.right();
+        if (this.getLines()[this.getCaratLine()].length > 0) {
+            this.right();
+        }
         this.setInsertMode();
     }
 
@@ -258,6 +375,9 @@ function VimtextArea(textArea) {
     }
 
     this.keyDown = function(e) {
+        if (this.keyCodeToCharacter(e.keyCode) == "<TAB>") {
+            this.insertStringAtCarat("    ");
+        }
         this.update();
     }
 
@@ -313,6 +433,9 @@ function VimtextArea(textArea) {
     }
 
     this.setNormalMode = function() {
+        if (this.getLines()[this.getCaratLine()].length > 0) {
+            this.left();
+        }
         this.insertMode = false;
         this.normalMode = true;
     }
