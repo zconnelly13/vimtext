@@ -36,6 +36,9 @@ function VimtextArea(textArea) {
     this.insertMode = true;
     this.normalMode = false;
 
+    this.copyBuffer = "";
+    this.copiedWholeLine = false;
+
     this.textArea = textArea;
     this.textArea.style.fontFamily = "Courier New";
     this.textArea.style.fontSize = "15px";
@@ -57,6 +60,42 @@ function VimtextArea(textArea) {
     this.element.style.fontSize = "15px";
     this.element.style.whiteSpace = "pre-wrap";
     this.element.setAttribute("tabindex",0);
+
+    this.history = [];
+    this.historyPosition = -1;
+    this.saveState = function() {
+        this.history = this.history.slice(0,this.historyPosition+1);
+        var state = {
+            caratPosition: this.getCaratPosition(),
+            textAreaValue: this.textArea.value + "" 
+        };
+        this.history.push(state);
+        this.historyPosition = this.history.length - 1;
+        console.log(this.history);
+    }
+
+    this.undo = function() {
+        if (this.historyPosition >= 0) {
+            this.historyPosition--;
+            var previousState = this.history[this.historyPosition];
+            this.loadState(previousState);
+        }
+    }
+
+    this.redo = function() {
+        if (this.historyPosition != this.history.length-1) {
+            this.historyPosition++;
+            var nextState = this.history[this.historyPosition];
+            this.loadState(nextState);
+        }
+    }
+
+    this.loadState = function(state) {
+        console.log(this.history);
+        this.textArea.value = state.textAreaValue;
+        this.textArea.selectionStart = state.caratPosition;
+        this.textArea.selectionEnd = state.caratPosition;
+    }
 
     this.replaceTextArea = function() {
         this.textArea.parentNode.insertBefore(this.element,textArea.nextSibling);
@@ -145,40 +184,75 @@ function VimtextArea(textArea) {
         return character;
     }
 
+    this.acceptMotion = false;
+    this.acceptMotionInitiator = null;
+    this.acceptMotionBuffer = "";
+
+    this.handleAcceptMotion = function(character,e) {
+        if (this.isANumberKeyCode(e.keyCode)) {
+            this.acceptMotionBuffer += character;
+        }
+        if (this.acceptMotionInitiator == "d") {
+            if (this.acceptMotionBuffer == "") {
+                this.acceptMotionBuffer = "1";
+            }
+            if (character == "d") {
+                var from = this.getCaratLine();
+                var to = this.getCaratLine() + parseInt(this.acceptMotionBuffer);
+                this.deleteLines(from,to);
+                this.acceptMotion = false;
+                this.saveState();
+            }
+            else
+            if (character == "h") {
+                var from = this.getCaratLine();
+                var to = this.getCaratLine() + parseInt(this.acceptMotionBuffer) + 1;
+                this.deleteLines(from,to);
+                this.acceptMotion = false;
+                this.saveState();
+            }
+            else
+            if (character == "t") {
+                var from = this.getCaratLine() - parseInt(this.acceptMotionBuffer);
+                var to = this.getCaratLine() + 1;
+                this.deleteLines(from,to);
+                this.acceptMotion = false;
+                this.saveState();
+            }
+        }
+    }
+
+    this.deleteLines = function(from,to) {
+        this.goToStartOfLine();
+        var position = this.getCaratPosition(); 
+        var lines = this.getLines();
+        this.copyBuffer = lines.splice(from,to-from);
+        this.copyBuffer = this.copyBuffer.join("\n");
+        this.copiedWholeLine = true;
+        var joinedLines = lines.join("\n");
+        this.textArea.value = joinedLines;
+        this.textArea.selectionStart = position;
+        this.textArea.selectionEnd = position;
+    }
+
+    this.isANumberKeyCode = function(keyCode) {
+        var isNumber = false;
+        if (keyCode >= 48 && keyCode <=57) {
+            isNumber = true;
+        }
+        return isNumber;
+    }
+
     this.normalKeyDown = function(e) {
         var keyCode = e.keyCode;
         var character = this.keyCodeToCharacter(keyCode);
+        if (this.acceptMotion) {
+            this.handleAcceptMotion(character,e);
+            this.update();
+            return;
+        }
         switch(character)
         {
-            case "i":
-                this.insert();
-                break;
-            case "a":
-                if (e.shiftKey) {
-                    this.appendToEndOfLine();
-                } else {
-                    this.append();
-                }
-                break;
-            case "t":
-                this.up();
-                break;
-            case "h":
-                this.down();
-                break;
-            case "n":
-                this.left();
-                break;
-            case "s":
-                this.right();
-                break;
-            case "o":
-                if (e.shiftKey) {
-                    this.insertLineAbove();
-                } else {
-                    this.insertLineBelow();
-                }
-                break;
             case "0":
                 this.goToStartOfLine();
                 break;
@@ -187,11 +261,90 @@ function VimtextArea(textArea) {
                     this.goToEndOfLine();
                 }
                 break;
+            case "a":
+                if (e.shiftKey) {
+                    this.appendToEndOfLine();
+                } else {
+                    this.append();
+                }
+                break;
+            case "d":
+                this.setAcceptMotion(character);
+                break;
+            case "h":
+                this.down();
+                break;
+            case "i":
+                this.insert();
+                break;
+            case "n":
+                this.left();
+                break;
+            case "o":
+                if (e.shiftKey) {
+                    this.insertLineAbove();
+                } else {
+                    this.insertLineBelow();
+                }
+                break;
+            case "p":
+                this.paste();
+                this.saveState();
+                break;
+            case "r":
+                if (e.ctrlKey) {
+                    this.redo();
+                }
+                break;
+            case "s":
+                this.right();
+                break;
+            case "t":
+                this.up();
+                break;
+            case "u":
+                this.undo();
+                break;
             default:
                 console.log(character);
         }
         console.log(keyCode + "," + character);
         this.update();
+    }
+
+    this.setAcceptMotion = function(character) {
+        this.acceptMotionInitiator = character;
+        this.acceptMotionBuffer = "";
+        this.acceptMotion = true;
+    }
+
+    this.paste = function() {
+        var linesToGoUp = 0;
+        if (this.copiedWholeLine) {
+            this.insertLineBelow();
+            this.setNormalMode();
+            var linesToGoUp = this.countAppearances(this.copyBuffer,/\n/gi);
+        }
+        this.insertStringAtCarat(this.copyBuffer);
+        this.goToStartOfLine();
+        this.goUp(linesToGoUp);
+    }
+
+    this.goUp = function(lines) {
+        for (var i=0;i<lines;i++) {
+            this.up();
+        }
+    }
+
+    this.countAppearances = function(string,regex) {
+        var appearances = 0;
+        var matches = string.match(regex);
+        if (matches == null) {
+            appearances = 0;
+        } else {
+            appearances = matches.length; 
+        }
+        return appearances;
     }
 
     this.insertStringAtCarat = function(string) {
@@ -430,6 +583,7 @@ function VimtextArea(textArea) {
         this.setElementEventListeners();
         this.setDocumentEventListeners();
         this.update();
+        this.saveState();
     }
 
     this.setNormalMode = function() {
@@ -452,6 +606,7 @@ function VimtextArea(textArea) {
                 vimtext.setNormalMode();
                 vimtext.element.focus();
                 vimtext.update();
+                vimtext.saveState();
             }
         });
     }
