@@ -134,7 +134,7 @@ function VimtextArea(textArea) {
 
     this.keyCodeToCharacter = function(keyCode,shift) {
         if (shift) {
-            var keyCode = keyCode + 100;
+            var keyCode = keyCode + 500;
         }
         var map = [
             [9,"<TAB>"],
@@ -177,45 +177,56 @@ function VimtextArea(textArea) {
             [89,"y"],
             [90,"z"],
 
-            [109,"<SHIFT-TAB>"],
+            [192,"`"],
+            [219,"["],
+            [221,"]"],
+            [719,"{"],
+            [721,"}"],
+            [222,"'"],
+            [722,'"'],
+            [688,"<"],
+            [690,">"],
 
-            [148,")"],
-            [149,"!"],
-            [150,"@"],
-            [151,"#"],
-            [152,"$"],
-            [153,"%"],
-            [154,"^"],
-            [155,"&"],
-            [156,"*"],
-            [157,"("],
+            // Shift Keys
+            [509,"<SHIFT-TAB>"],
 
-            [165,"A"],
-            [166,"B"],
-            [167,"C"],
-            [168,"D"],
-            [169,"E"],
-            [170,"F"],
-            [171,"G"],
-            [172,"H"],
-            [173,"I"],
-            [174,"J"],
-            [175,"K"],
-            [176,"L"],
-            [177,"M"],
-            [178,"N"],
-            [179,"O"],
-            [180,"P"],
-            [181,"Q"],
-            [182,"R"],
-            [183,"S"],
-            [184,"T"],
-            [185,"U"],
-            [186,"V"],
-            [187,"W"],
-            [188,"X"],
-            [189,"Y"],
-            [190,"Z"],
+            [548,")"],
+            [549,"!"],
+            [550,"@"],
+            [551,"#"],
+            [552,"$"],
+            [553,"%"],
+            [554,"^"],
+            [555,"&"],
+            [556,"*"],
+            [557,"("],
+
+            [565,"A"],
+            [566,"B"],
+            [567,"C"],
+            [568,"D"],
+            [569,"E"],
+            [570,"F"],
+            [571,"G"],
+            [572,"H"],
+            [573,"I"],
+            [574,"J"],
+            [575,"K"],
+            [576,"L"],
+            [577,"M"],
+            [578,"N"],
+            [579,"O"],
+            [580,"P"],
+            [581,"Q"],
+            [582,"R"],
+            [583,"S"],
+            [584,"T"],
+            [585,"U"],
+            [586,"V"],
+            [587,"W"],
+            [588,"X"],
+            [589,"Y"],
+            [590,"Z"],
 
         ];
         var character = "";
@@ -231,89 +242,279 @@ function VimtextArea(textArea) {
     this.acceptMotionInitiator = null;
     this.acceptMotionBuffer = "";
 
+    this.getLocationOfCharacterInFrontOfCaratOnCurrentLine = function(character,occurences) {
+        var lines = this.getLines();
+        var currentLine = this.getLines()[this.getCaratLine()];
+        var currentPosition = this.getCaratPositionOnLine();
+        var searchString = currentLine.substr(currentPosition+1);
+        var count = searchString.match(new RegExp(character,"g"));
+        var indexOfCharacterOnLine = null;
+        if (count !== null && count.length >= occurences) {
+            var indexOfCharacterOnLine  = searchString.split(character,occurences).join(character).length;
+        } else {
+            indexOfCharacterOnLine = null;
+        }
+        return indexOfCharacterOnLine;
+    }
+
+    this.deleteUntil = function(character,occurences) {
+        var locationOfCharacterRelativeToCursor = this.getLocationOfCharacterInFrontOfCaratOnCurrentLine(character,occurences);
+        this.deleteRangeRight(this.getCaratPosition(),this.getCaratPosition()+locationOfCharacterRelativeToCursor+1);
+        var deleted = true;
+        if (locationOfCharacterRelativeToCursor == null) {
+            deleted = false;
+        }
+        return deleted;
+    }
+
+    this.reverseString = function(string) {
+        var reversedString = string.split("").reverse().join("");
+        return reversedString;
+    }
+
+    this.getLocationOfNthOccurence = function(string,character,occurences) {
+        var count = string.match(new RegExp("\\" + character,"g"));
+        var locationOfCharacter = null;
+        if (count !== null && count.length >= occurences) {
+            locationOfCharacter = string.split(character,occurences).join(character).length;
+        } else {
+            locationOfCharacter = null;
+        }
+        return locationOfCharacter;
+    }
+
+    this.getLocationOfLastNthOccurence = function(string,character,occurences) {
+        var string = this.reverseString(string);
+        var backWardsLocation = this.getLocationOfNthOccurence(string,character,occurences);
+        var locationOfCharacter = null;
+        if (backWardsLocation !== null) {
+            locationOfCharacter = string.length - backWardsLocation;
+        }
+        return locationOfCharacter;
+    }
+
+    this.getBuddyCharacter = function(character) {
+        var buddyCharacters =
+        [
+            ["[","]"],
+            ["{","}"],
+            ['"','"'],
+            ["'","'"],
+            ["`","`"],
+            ["(",")"],
+            ["<",">"]
+        ];
+        var buddy = "";
+        for (var i=0;i<buddyCharacters.length;i++) {
+            var pair = buddyCharacters[i];
+            if (character == pair[0]) {
+                buddy = pair[1];
+                break;
+            }
+            else
+            if (character == pair[1]) {
+                buddy = pair[0];
+                break;
+            }
+        }
+        return buddy;
+    }
+
+    this.isLeftBuddyCharacter = function(character) {
+        var leftBuddyCharacters = "[{" + '"' + "'" + "`(<"; 
+        var leftBuddyCharacter = false;
+        if (leftBuddyCharacters.indexOf(character) > -1) {
+            leftBuddyCharacter = true;
+        }
+        return leftBuddyCharacter;
+    }
+
+    this.replaceCharacterUnderCursor = function(character) {
+        this.deleteRangeRight(this.getCaratPosition(),this.getCaratPosition()+1);
+        this.insertStringAtCarat(character);
+        this.moveCaratLeft(1);
+    }
+
+    this.keyCodeIsNotAModifierKey = function(keyCode) {
+        var isNotModifier = false;
+        if(keyCode != 16 && keyCode != 91 && keyCode != 17 && keyCode != 18) {
+            isNotModifier = true;
+        }
+        return isNotModifier;
+    }
+
+    this.getDistanceToStartOfNextWord = function() {
+        var string = this.textArea.value.substr(this.getCaratPosition() + 1);
+        var start = string.split(/[\s,\n]/g)[0].length+2;
+        return start;
+    }
+
+    this.moveToStartOfNextWord = function() {
+        var distance = this.getDistanceToStartOfNextWord();
+        this.moveCaratRight(distance);
+    }
+
+    this.getDistanceToEndOfNextWord = function() {
+        var end = this.getDistanceToStartOfNextWord()-2;
+        if (this.getDistanceToStartOfNextWord() == 2) {
+            this.right();
+            end = this.getDistanceToEndOfNextWord();
+        }
+        return end;
+    }
+
+    this.moveToEndOfNextWord = function() {
+        var distance = this.getDistanceToEndOfNextWord();
+        this.moveCaratRight(distance);
+    }
+
     this.handleAcceptMotion = function(character,e) {
+        if (e.keyCode == 27) {
+            this.acceptMotion = false;
+            return;
+        }
         if (this.isANumberKeyCode(e.keyCode)) {
             this.acceptMotionBuffer += character;
         }
-        if (this.acceptMotionInitiator == "d") {
+        if (this.acceptMotionInitiator == "r") {
             if (this.acceptMotionBuffer == "") {
-                this.acceptMotionBuffer = "1";
+                this.acceptMotionBudder = "1";
             }
-            // delete until (dt[character])
-            if (this.acceptMotionBuffer.indexOf("u") > -1 && e.keyCode != 16 && e.keyCode != 91 && e.keyCode != 17 && e.keyCode != 18) {
-                var character = this.keyCodeToCharacter(e.keyCode,e.shiftKey);
-                console.log("Delete until: " + character);
-                this.acceptMotion = false;
+            // replace character (r[character])
+            if (this.keyCodeIsNotAModifierKey(e.keyCode)) {
+                this.replaceCharacterUnderCursor(this.keyCodeToCharacter(e.keyCode,e.shiftKey));
                 this.saveState();
-                return;
-            }
-            // delete line (dd)
-            if (character == "d") {
-                var from = this.getCaratLine();
-                var to = this.getCaratLine() + parseInt(this.acceptMotionBuffer);
-                this.deleteLines(from,to);
                 this.acceptMotion = false;
-                this.saveState();
-            }
-            else
-            // delete down (dj)
-            if (character == "h") {
-                var from = this.getCaratLine();
-                var to = this.getCaratLine() + parseInt(this.acceptMotionBuffer) + 1;
-                this.deleteLines(from,to);
-                this.acceptMotion = false;
-                this.saveState();
-            }
-            else
-            // delete up (dk)
-            if (character == "t") {
-                var from = this.getCaratLine() - parseInt(this.acceptMotionBuffer);
-                var to = this.getCaratLine() + 1;
-                this.deleteLines(from,to);
-                this.acceptMotion = false;
-                this.saveState();
-            }
-            else
-            // delete left (dh)
-            if (character == "n") {
-                var positionOnLine = this.getCaratPositionOnLine();
-                var inputNumber = parseInt(this.acceptMotionBuffer);
-                var deleteSize;
-                if (inputNumber < positionOnLine) {
-                    deleteSize = inputNumber;
-                } else {
-                    deleteSize = positionOnLine;
-                }
-                var from = this.getCaratPosition() - deleteSize;
-                var to = this.getCaratPosition();
-                this.deleteRangeLeft(from,to);
-                this.acceptMotion = false;
-                this.saveState();
-            }
-            // delete right (dl)
-            else
-            if (character == "s") {
-                var positionOnLine = this.getCaratPositionOnLine();
-                var lineSize = this.getLines()[this.getCaratLine()].length;
-                var inputNumber = parseInt(this.acceptMotionBuffer);
-                var deleteSize;
-                if (inputNumber < (lineSize-positionOnLine)) {
-                    deleteSize = inputNumber;
-                } else {
-                    deleteSize = lineSize - positionOnLine;
-                }
-                var from = this.getCaratPosition();
-                var to = this.getCaratPosition() + deleteSize;
-                this.deleteRangeRight(from,to);
-                this.acceptMotion = false;
-                this.saveState();
-            }
-            else
-            // delete till (dt[character])
-            if (character == "u") {
-                this.acceptMotionBuffer += "u";
             }
         }
+        else
+            if (this.acceptMotionInitiator == "d") {
+                if (this.acceptMotionBuffer == "") {
+                    this.acceptMotionBuffer = "1";
+                }
+                // delete until (dt[character])
+                if (this.acceptMotionBuffer.indexOf("u") > -1 && this.keyCodeIsNotAModifierKey(e.keyCode)) {
+                    var character = this.keyCodeToCharacter(e.keyCode,e.shiftKey);
+                    var numberOfOccurences = parseInt(this.acceptMotionBuffer);
+                    var deleted = this.deleteUntil(character,numberOfOccurences);
+                    if (deleted) {
+                        this.saveState();
+                    }
+                    this.acceptMotion = false;
+                    return;
+                }
+                else
+                    // delete fru(through) (df[character])
+                    if (this.acceptMotionBuffer.indexOf("f") > -1 && this.keyCodeIsNotAModifierKey(e.keyCode)) {
+                        var character = this.keyCodeToCharacter(e.keyCode,e.shiftKey);
+                        var numberOfOccurences = parseInt(this.acceptMotionBuffer);
+                        var deleted = this.deleteUntil(character,numberOfOccurences);
+                        if (deleted) {
+                            this.deleteRangeRight(this.getCaratPosition(),this.getCaratPosition()+1);
+                            this.saveState();
+                        }
+                        this.acceptMotion = false;
+                        return;
+                    }
+                    else
+                        // delete inside (di[character]) 
+                        if (this.acceptMotionBuffer.indexOf("i") > -1 && this.keyCodeIsNotAModifierKey(e.keyCode)) {
+                            var character = this.keyCodeToCharacter(e.keyCode,e.shiftKey); 
+                            var validCharacters = "[]{}" + '"' + "'" + "`()<>"; 
+                            if (validCharacters.indexOf(character) > -1) {
+                                var numberOfPairs = parseInt(this.acceptMotionBuffer);
+                                var buddyCharacter = this.getBuddyCharacter(character);
+                                var leftString = this.textArea.value.substr(0,this.getCaratPosition());
+                                var rightString = this.textArea.value.substr(this.getCaratPosition());
+                                var leftCharacter;
+                                var rightCharacter;
+                                if (this.isLeftBuddyCharacter(character)) {
+                                    leftCharacter = character;
+                                    rightCharacter = buddyCharacter;
+                                } else {
+                                    leftCharacter = buddyCharacter;
+                                    rightCharacter = character;
+                                }
+                                var locationOfLeftCharacter = this.getLocationOfLastNthOccurence(leftString,leftCharacter,numberOfPairs);
+                                var locationOfRightCharacter = this.getLocationOfNthOccurence(rightString,rightCharacter,numberOfPairs);
+                                if (locationOfLeftCharacter !== null && locationOfRightCharacter !== null) {
+                                    locationOfRightCharacter += this.getCaratPosition();
+                                    this.moveCaratLeft(this.getCaratPosition()-locationOfLeftCharacter);
+                                    this.deleteRangeRight(locationOfLeftCharacter,locationOfRightCharacter);
+                                    this.saveState();
+                                }
+                            }
+                            this.acceptMotion = false;
+                            return;
+                        }
+                        else
+                            // delete line (dd)
+                            if (character == "d") {
+                                var from = this.getCaratLine();
+                                var to = this.getCaratLine() + parseInt(this.acceptMotionBuffer);
+                                this.deleteLines(from,to);
+                                this.acceptMotion = false;
+                                this.saveState();
+                            }
+                            else
+                                // delete down (dj)
+                                if (character == "h") {
+                                    var from = this.getCaratLine();
+                                    var to = this.getCaratLine() + parseInt(this.acceptMotionBuffer) + 1;
+                                    this.deleteLines(from,to);
+                                    this.acceptMotion = false;
+                                    this.saveState();
+                                }
+                                else
+                                    // delete up (dk)
+                                    if (character == "t") {
+                                        var from = this.getCaratLine() - parseInt(this.acceptMotionBuffer);
+                                        var to = this.getCaratLine() + 1;
+                                        this.deleteLines(from,to);
+                                        this.acceptMotion = false;
+                                        this.saveState();
+                                    }
+                                    else
+                                        // delete left (dh)
+                                        if (character == "n") {
+                                            var positionOnLine = this.getCaratPositionOnLine();
+                                            var inputNumber = parseInt(this.acceptMotionBuffer);
+                                            var deleteSize;
+                                            if (inputNumber < positionOnLine) {
+                                                deleteSize = inputNumber;
+                                            } else {
+                                                deleteSize = positionOnLine;
+                                            }
+                                            var from = this.getCaratPosition() - deleteSize;
+                                            var to = this.getCaratPosition();
+                                            this.deleteRangeLeft(from,to);
+                                            this.acceptMotion = false;
+                                            this.saveState();
+                                        }
+                // delete right (dl)
+                                        else
+                                            if (character == "s") {
+                                                var positionOnLine = this.getCaratPositionOnLine();
+                                                var lineSize = this.getLines()[this.getCaratLine()].length;
+                                                var inputNumber = parseInt(this.acceptMotionBuffer);
+                                                var deleteSize;
+                                                if (inputNumber < (lineSize-positionOnLine)) {
+                                                    deleteSize = inputNumber;
+                                                } else {
+                                                    deleteSize = lineSize - positionOnLine;
+                                                }
+                                                var from = this.getCaratPosition();
+                                                var to = this.getCaratPosition() + deleteSize;
+                                                this.deleteRangeRight(from,to);
+                                                this.acceptMotion = false;
+                                                this.saveState();
+                                            }
+                                            else
+                                                // delete till (dt[character])
+                                                if (character == "u" || character == "f" || character == "i" || character == "e") {
+                                                    this.acceptMotionBuffer += character;
+                                                }
+            }
     }
 
     this.deleteRangeLeft = function(from,to) {
@@ -383,6 +584,9 @@ function VimtextArea(textArea) {
             case "d":
                 this.setAcceptMotion(character);
                 break;
+            case "e":
+                this.moveToEndOfNextWord();
+                break;
             case "h":
                 this.down();
                 break;
@@ -406,6 +610,8 @@ function VimtextArea(textArea) {
             case "r":
                 if (e.ctrlKey) {
                     this.redo();
+                } else {
+                    this.setAcceptMotion(character);
                 }
                 break;
             case "s":
@@ -417,6 +623,9 @@ function VimtextArea(textArea) {
             case "u":
                 this.undo();
                 break;
+            case "w":
+                this.moveToStartOfNextWord();
+                break;
             default:
                 console.log(character);
         }
@@ -426,8 +635,8 @@ function VimtextArea(textArea) {
 
     this.setAcceptMotion = function(character) {
         this.acceptMotionInitiator = character;
-        this.acceptMotionBuffer = "";
         this.acceptMotion = true;
+        this.acceptMotionBuffer = "";
     }
 
     this.paste = function() {
@@ -715,7 +924,9 @@ function VimtextArea(textArea) {
         var vimtext = this;
         document.addEventListener('keyup',function(e) {
             if (e.keyCode == 27) {
-                vimtext.setNormalMode();
+                if (vimtext.insertMode) {
+                    vimtext.setNormalMode();
+                }
                 vimtext.element.focus();
                 vimtext.update();
                 vimtext.saveState();
